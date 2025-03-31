@@ -1,0 +1,20 @@
+{
+  "name": "p2p-videocall",
+  "version": "1.0.0",
+  "description": "Simple P2P videocall app",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "author": "pintr",
+  "license": "MIT"
+}
