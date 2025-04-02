@@ -2,6 +2,7 @@
 .devcontainer
 .deployment
 .env
+dist
 
 # Logs
 logs

@@ -3,23 +3,24 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "npm run dev:backend && npm run dev:frontend",
-    "dev": "ts-node-dev --respawn --transpile-only backend/server.ts",
-    "dev:frontend": "cd frontend && npm start",
-    "dev:backend": "tsc",
+    "start": "node dist/backend/server.js",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "ts-node-dev --respawn --transpile-only backend/server.ts",
+    "dev:frontend": "cd frontend && npm run dev",
     "build": "npx tsc && cd frontend && npm run build"
   },
   "author": "pintr",
   "license": "MIT",
   "description": "Simple P2P videocall app",
   "dependencies": {
+    "concurrently": "^9.1.2",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.1",
-    "@types/node": "^22.13.17",
+    "@types/node": "^22.14.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.1",
     "ts-node-dev": "^2.0.0",
