@@ -11,8 +11,6 @@ const __dirname = dirname(__filename);
 
 // Environment detection
 const isProd = process.env.NODE_ENV === 'prod';
-console.log("ENV", process.env.METERED_KEY)
-
 console.log(`Running in ${isProd ? 'production' : 'development'} mode`);
 
 const app = express();
@@ -37,12 +35,10 @@ if (isProd) {
 
 io.on('connection', (socket) => {
   function log(...args: string[]) {
-    var array: string[] = ['Message from server:'];
+    var array = ['Message from server:'];
     array.push.apply(args);
     socket.emit('log', args);
   }
-
-
 })
 
 const PORT = process.env.PORT || 3000
