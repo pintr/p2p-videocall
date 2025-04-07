@@ -12,7 +12,17 @@ export class Room {
   /**
    * The list of users currently in the room.
    */
-  users: User[];
+  users: Map<string, User>;
+
+  /*
+   * Timestamp when the room was created.
+   */
+  created: number;
+
+  /**
+   * Maximum number of users. Default: 2
+   */
+  maxUsers: number;
 
   /**
    * Creates a new Room instance.
@@ -20,7 +30,9 @@ export class Room {
    */
   constructor(id: string) {
     this.id = id;
-    this.users = [];
+    this.users = new Map<string, User>();
+    this.created = Date.now();
+    this.maxUsers = 2;
   }
 
   /**
@@ -28,9 +40,7 @@ export class Room {
    * @param user - The user to be added to the room.
    */
   addUser(user: User) {
-    if (this.users.length < 2) {
-      this.users.push(user);
-    }
+    this.users.set(user.id, user);
   }
 
   /**
@@ -38,14 +48,32 @@ export class Room {
    * @param userId - The unique identifier of the user to be removed.
    */
   removeUser(userId: string) {
-    this.users = this.users.filter((user) => user.id !== userId);
+    this.users.delete(userId);
+  }
+
+  /**
+   * Get a user based on its id.
+   * @param userId - The unique identifier of the user.
+   * 
+   * @returns The user if it exists, `undefined` otherwise .
+   */
+  getUser(userId: string): User | undefined {
+    return this.users.get(userId);
   }
 
   /**
    * Checks if the room is full.
-   * @returns `true` if the room has 2 or more users, otherwise `false`.
+   * @returns `true` if the room is empty, `false` otherwise.
+   */
+  isEmpty(): boolean {
+    return this.users.size === 0;
+  }
+
+  /**
+   * Checks if the room is full.
+   * @returns `true` if the room has 2 or more users, `false` otherwise.
    */
   isFull(): boolean {
-    return this.users.length >= 2;
+    return this.users.size >= this.maxUsers;
   }
 }

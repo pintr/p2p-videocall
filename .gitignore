@@ -39,6 +39,7 @@ node_modules
 jspm_packages
 package-lock.json
 .DS_Store
+tsconfig.tsbuildinfo
 
 # Optional npm cache directory
 .npm

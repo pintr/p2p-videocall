@@ -18,29 +18,21 @@ export class User {
   roomId: string;
 
   /**
-   * Indicates whether the user is the host of the room.
-   * A user is considered the host if they created the room.
+   * Timestamp when the user joined.
    */
-  isHost: boolean;
-
-  /**
-   * Indicates whether the user is currently connected to another peer.
-   */
-  connected: boolean;
+  joined: number;
 
   /**
    * Creates a new User instance.
    * 
-   * @param id - The unique identifier for the user (socket ID).
-   * @param name - The display name of the user.
-   * @param roomId - The ID of the room the user is in.
-   * @param isHost - Whether the user is the host of the room.
+   * @param {string} id - The unique identifier for the user (socket ID).
+   * @param {string} name - The display name of the user.
+   * @param {string} roomId - The ID of the room the user is in.
    */
-  constructor(id: string, name: string, roomId: string, isHost: boolean) {
+  constructor(id: string, name: string, roomId: string) {
     this.id = id;
     this.name = name;
     this.roomId = roomId;
-    this.isHost = isHost;
-    this.connected = false;
+    this.joined = Date.now();
   }
 }

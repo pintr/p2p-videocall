@@ -4,12 +4,12 @@
   "private": true,
   "scripts": {
     "install": "cd backend && npm i && cd ../frontend && npm i",
-    "dev": "concurrently -n:BE,FE -c bgBlue.bold,bgGreen.bold \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently -n BE,FE -c bgBlue.bold,bgGreen.bold \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "NODE_ENV=prod npm run build:frontend && npm run build:backend",
-    "build:frontend": "cd frontend && npm run build --emptyOutDir",
-    "build:backend": "cd backend && tsc",
+    "build:frontend": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
     "start": "NODE_ENV=prod node backend/dist/server.js",
     "azure": "npm run build && cd backend && npm prune --production"
   },
@@ -17,7 +17,8 @@
   "license": "MIT",
   "description": "Simple P2P videocall app",
   "devDependencies": {
+    "@types/socket.io": "^3.0.1",
     "concurrently": "^9.1.2",
-    "typescript": "5.8.2"
+    "typescript": "^5.8.3"
   }
 }
