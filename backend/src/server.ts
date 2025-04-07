@@ -5,9 +5,9 @@ import { fileURLToPath } from 'url';
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { IIceServer } from "./models/IIceServer.js";
+import { IPayload } from './models/IPayload.js';
 import { Room } from './models/Room.js';
 import { User } from './models/User.js';
-import { IPayload } from './models/IPayload.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
