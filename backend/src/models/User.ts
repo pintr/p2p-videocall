@@ -35,4 +35,18 @@ export class User {
     this.roomId = roomId;
     this.joined = Date.now();
   }
+  /**
+   * Serializes the User instance into a plain object.
+   * 
+   * @returns {object} A plain object representation of the user.
+   */
+  serialize(): object {
+    return {
+      id: this.id,
+      name: this.name,
+      roomId: this.roomId,
+      joined: new Date(this.joined),
+    };
+  }
+
 }

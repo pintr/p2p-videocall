@@ -4,8 +4,6 @@ import path, { dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { IIceServer } from "./models/IIceServer.js";
-import { IPayload } from './models/IPayload.js';
 import { Room } from './models/Room.js';
 import { User } from './models/User.js';
 
@@ -19,16 +17,18 @@ console.log(`Running in ${isProd ? 'production' : 'development'} mode`);
 // App init
 const app = express();
 const server = createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: isProd ? undefined : { origin: '*' }
+});
 
 const rooms = new Map<string, Room>();
 
 // Set and retrieve ICE server configuration
-let iceServers: IIceServer[];
+let iceServers: RTCIceServer[];
 
 fetch(`https://signallingtest.metered.live/api/v1/turn/credentials?apiKey=${process.env.METERED_KEY}`)
   .then(async (response: Response) => {
-    iceServers = await response.json() as IIceServer[];
+    iceServers = await response.json() as RTCIceServer[];
   });
 
 // Serve static files in production
@@ -41,7 +41,8 @@ if (isProd) {
 
 // Handle new client connection
 io.on('connection', (socket) => {
-  let sockedId = socket.id;
+  let room: Room;
+  let user: User;
   console.log('User connected:', socket.id);
 
   /**
@@ -53,9 +54,11 @@ io.on('connection', (socket) => {
    * 
    * @emits log - Emits the log message to the client with the same event name 'log'
    */
-  function log(roomId: string, ...args: string[]) {
-    const array = ['Message from server:', ...args];
-    socket.to(roomId).emit('log', array);
+  function log(...data: any) {
+
+    if (!isProd) console.log(data);
+
+    io.to(room.id).emit('log', data);
   }
 
   /**
@@ -64,118 +67,100 @@ io.on('connection', (socket) => {
    * @param {Object} payload - The join request data
    * @param {string} payload.roomId - The ID of the room to join/create
    * @param {string} payload.username - The username of the joining client
+   * @param {boolean} payload.config - Whther the user needs the config (i.e. the iceServers)
    * 
    * @emits {config} To all clients in the room - Sends ICE server configuration
    * 
    * @listens join - Triggered when a client wants to join a room
    */
-  socket.on('join', ({ roomId, username }) => {
-    let room = rooms.get(roomId);
-    let created = false;
-    if (!room) {
-      created = true;
+  socket.on('join', ({ roomId, username, config }) => {
+    let exists = rooms.has(roomId);
+    if (exists) {
+      room = rooms.get(roomId) as Room;
+      if (room.getUser(socket.id)) return;
+    } else {
       room = new Room(roomId);
-      rooms.set(roomId, room);
+      rooms.set(room.id, room);
     }
 
     if (room.isFull()) {
-      socket.to(sockedId).emit('full');
+      log(`[${room.id}] - Room is full`);
       return;
     }
 
-    const user = new User(sockedId, username, roomId);
+    user = new User(socket.id, username, room.id);
     room.addUser(user);
-    socket.join(roomId);
+    socket.join(room.id);
 
-    if (created) {
-      log(`[${room}] - Room created by user ${user.name}`);
-    }
+    if (!exists) log(`Room "${room.id}" created by user ${user.name}`);
 
-    log(`[${room}] - User ${user.name} joined`);
+    log(`[${room.id}] - User ${user.name} joined`);
 
-    socket.emit('joined', {
-      iceServers: JSON.stringify(iceServers),
-      room: JSON.stringify(room)
-    });
+    socket.emit('joined', user, room, config ? iceServers : null);
 
-    if (room.isFull()) {
-      socket.to(roomId).emit('ready');
-    }
+
+    if (room.isFull()) socket.to(room.id).emit('ready');
   });
 
   /**
    * Handles a 'offer' event from a client sending an SDP offer to peers.
    * 
-   * @param {IPayload} payload - The offer payload
-   * @param {string} payload.userId - The ID of the user sending the offer
-   * @param {string} payload.roomId - The ID of the room
-   * @param {string} payload.data - The SDP offer data
+   * @param {string} offer - The SDP offer string
    * 
-   * @emits offer - Forwards the offer to other clients in the room
+   * @emits offer - Forwards the offer along with user information to other clients in the room
    * 
    * @listens offer - Triggered when a client sends an offer
    */
-  socket.on('offer', ({ userId, roomId, data }: IPayload) => {
-    log(`[${roomId}] - User ${userId} offer: `, data);
-    socket.to(roomId).emit('offer', { userId, data });
+  socket.on('offer', (offer: RTCSessionDescriptionInit) => {
+    log(`[${room.id}] - User ${user.name} offer`, offer);
+    socket.to(room.id).emit('offer', offer);
   });
 
   /**
    * Handles an 'answer' event from a client responding to an SDP offer.
    * 
-   * @param {IPayload} payload - The answer payload
-   * @param {string} payload.userId - The ID of the user sending the answer
-   * @param {string} payload.roomId - The ID of the room
-   * @param {string} payload.data - The SDP answer data
+   * @param {string} answer - The SDP answer string
    * 
-   * @emits answer - Forwards the answer to other clients in the room
+   * @emits answer - Forwards the answer along with user information to other clients in the room
    * 
    * @listens answer - Triggered when a client sends an answer to an offer
    */
-  socket.on('answer', ({ userId, roomId, data }: IPayload) => {
-    log(`[${roomId}] - User ${userId} answer: `, data);
-    socket.to(roomId).emit('answer', { userId, data });
+  socket.on('answer', (answer: RTCSessionDescriptionInit) => {
+    log(`[${room.id}] - User ${user.name} answer`, answer);
+    socket.to(room.id).emit('answer', answer);
   });
 
   /**
    * Handles a 'candidate' event from a client sending ICE candidates.
    * 
-   * @param {IPayload} payload - The candidate payload
-   * @param {string} payload.userId - The ID of the user sending the candidate
-   * @param {string} payload.roomId - The ID of the room
-   * @param {string} payload.data - The ICE candidate data
+   * @param {string} candidate - The ICE candidate string
    * 
-   * @emits candidate - Forwards the ICE candidate to other clients in the room
+   * @emits candidate - Forwards the ICE candidate along with user information to other clients in the room
    * 
    * @listens candidate - Triggered when a client sends an ICE candidate
    */
-  socket.on('candidate', ({ userId, roomId, data }: IPayload) => {
-    log(`[${roomId}] - User ${userId} candidate: `, data);
-    socket.to(roomId).emit('candidate', { userId, data });
+  socket.on('candidate', (candidate: RTCIceCandidate) => {
+    log(`[${room.id}] - User ${user.name} candidate`, candidate);
+    socket.to(room.id).emit('candidate', candidate);
   });
 
 
   /**
    * Handles a 'leave' event from a client disconnecting from a room.
    * 
-   * @param {Object} payload - The leave payload
-   * @param {string} payload.userId - The ID of the user leaving
-   * @param {string} payload.roomId - The ID of the room being left
-   * 
    * @emits leave - Notifies other clients in the room about the departure
    * 
    * @listens leave - Triggered when a client leaves a room
    */
-  socket.on('leave', ({ userId, roomId }: IPayload) => {
-    log(`[${roomId}] - User ${userId} leaves`);
-    const room = rooms.get(roomId);
+  socket.on('leave', () => {
+    log(`[${room.id}] - User ${user.name} left`);
     if (!room) return;
-    room.removeUser(userId);
-    socket.to(roomId).emit('leave', userId);
+    room.removeUser(user.id);
+    socket.to(room.id).emit('leave', user);
 
     if (room.isEmpty()) {
-      log(`[${roomId}] - Empty room`);
-      rooms.delete(roomId);
+      log(`[${room.id}] - Empty room`);
+      rooms.delete(room.id);
     }
   });
 });

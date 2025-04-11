@@ -55,7 +55,7 @@ export class Room {
    * Get a user based on its id.
    * @param userId - The unique identifier of the user.
    * 
-   * @returns The user if it exists, `undefined` otherwise .
+   * @returns {User | undefined}  The user if it exists, `undefined` otherwise .
    */
   getUser(userId: string): User | undefined {
     return this.users.get(userId);
@@ -63,7 +63,7 @@ export class Room {
 
   /**
    * Checks if the room is full.
-   * @returns `true` if the room is empty, `false` otherwise.
+   * @returns {boolean}  `true` if the room is empty, `false` otherwise.
    */
   isEmpty(): boolean {
     return this.users.size === 0;
@@ -71,9 +71,22 @@ export class Room {
 
   /**
    * Checks if the room is full.
-   * @returns `true` if the room has 2 or more users, `false` otherwise.
+   * @returns {boolean}  `true` if the room has 2 or more users, `false` otherwise.
    */
   isFull(): boolean {
     return this.users.size >= this.maxUsers;
+  }
+
+  /**
+   * Serializes the room to a plain object.
+   * @returns {object} An object representation of the room.
+   */
+  serialize(): object {
+    return {
+      id: this.id,
+      users: Array.from(this.users.values()).map(user => user.serialize()),
+      created: new Date(this.created),
+      maxUsers: this.maxUsers,
+    };
   }
 }
