@@ -66,7 +66,7 @@ interface ServerToClientEvents {
   offer: (offer: RTCSessionDescriptionInit) => void;
   answer: (answer: RTCSessionDescriptionInit) => void;
   candidate: (candidate: RTCIceCandidate) => void;
-  leave: () => void;
+  leave: (user: User) => void;
 }
 
 /**
@@ -187,17 +187,23 @@ export default function App() {
      * Handles peer leaving the call
      * @param {User} user - The user who left
      */
-    socket.on("leave", () => {
+    socket.on("leave", (user) => {
+      console.log(`User ${user} left`);
 
+      if (remoteVideo.current) {
+        remoteVideo.current.srcObject = null;
+      }
     });
 
     // Cleanup function to remove event listeners
     return () => {
       socket.off("log");
       socket.off("joined");
+      socket.off("ready");
       socket.off("offer");
       socket.off("answer");
       socket.off("candidate");
+      socket.off("leave");
     };
   }, []);
 
@@ -314,6 +320,8 @@ export default function App() {
    * Closes peer connection and cleans up media resources
    */
   const handleHangUp = () => {
+    setCall(false)
+    socket.emit("leave")
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;

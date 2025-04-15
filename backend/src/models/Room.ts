@@ -14,7 +14,7 @@ export class Room {
    */
   users: Map<string, User>;
 
-  /*
+  /** 
    * Timestamp when the room was created.
    */
   created: number;
