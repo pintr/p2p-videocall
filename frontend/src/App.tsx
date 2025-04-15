@@ -62,9 +62,9 @@ interface Join {
 interface ServerToClientEvents {
   log: (logs: string[]) => void;
   joined: (user: User, room: Room, _iceServers: RTCIceServer[]) => void;
-  ready: () => void;
-  offer: (offer: RTCSessionDescriptionInit) => void;
-  answer: (answer: RTCSessionDescriptionInit) => void;
+  ready: (user: User) => void;
+  offer: (user: User, offer: RTCSessionDescriptionInit) => void;
+  answer: (user: User, answer: RTCSessionDescriptionInit) => void;
   candidate: (candidate: RTCIceCandidate) => void;
   leave: (user: User) => void;
 }
@@ -94,6 +94,8 @@ const constraints = {
   video: true
 };
 
+const interval = 10000;
+
 /**
  * Main application component for P2P video calling
  * Handles WebRTC connection setup, signaling, and UI for video chat
@@ -101,8 +103,11 @@ const constraints = {
  * @returns {JSX.Element} The rendered application interface
  */
 export default function App() {
-  const [name, setName] = useState("");
-  const [room, setRoom] = useState("room1");
+  const [userName, setUserName] = useState("");
+  const [roomId, setRoomId] = useState("room1");
+  const [localUser, setLocalUser] = useState<User | null>(null);
+  const [remoteUser, setRemoteUser] = useState<User | null>(null);
+  const [room, setRoom] = useState<Room | null>(null);
   const [call, setCall] = useState(false);
 
   const iceServers = useRef<RTCIceServer[] | null>(null);
@@ -122,7 +127,7 @@ export default function App() {
      * @param {string[]} data - Log messages from server
      */
     socket.on("log", (data) => {
-      console.log("SERVER", data);
+      console.log("%c SERVER", "color: #4287f5", data);
     });
 
     /**
@@ -132,10 +137,11 @@ export default function App() {
      * @param {RTCIceServer[] | null} servers - STUN/TURN servers for connection
      */
     socket.on("joined", (user, room, _iceServers) => {
-      console.log("JOINED", "USER", user, "ROOM", room, "ICE Servers", _iceServers);
+      console.log("JOINED", "USER", user, "ROOM", room, _iceServers);
+      setLocalUser(user);
+      setRoom(room);
       if (_iceServers) iceServers.current = _iceServers;
       joined.current = true;
-
     });
 
     /**
@@ -155,23 +161,26 @@ export default function App() {
      * Handles incoming WebRTC offer from peer
      * @param {RTCSessionDescriptionInit} offer - SDP offer from remote peer
      */
-    socket.on("offer", (offer) => {
+    socket.on("offer", (user, offer) => {
       setupPeerConnection();
       sendAnswer(offer);
+      setRemoteUser(user);
     });
 
     /**
      * Handles incoming WebRTC answer from peer
      * @param {RTCSessionDescriptionInit} answer - SDP answer from remote peer
      */
-    socket.on("answer", (answer) => {
-      console.log('Received answer, set remote description');
+    socket.on("answer", (user, answer) => {
+      console.log("Received answer, set remote description");
 
       if (!peerConnection.current) {
         throw new Error("Peer connection not initialized");
       }
 
       peerConnection.current.setRemoteDescription(answer);
+      setRemoteUser(user);
+      logIceCandidates();
       setCall(true);
     });
 
@@ -188,7 +197,7 @@ export default function App() {
      * @param {User} user - The user who left
      */
     socket.on("leave", (user) => {
-      console.log(`User ${user} left`);
+      console.log(`User ${user.name} left`);
 
       if (remoteVideo.current) {
         remoteVideo.current.srcObject = null;
@@ -239,6 +248,48 @@ export default function App() {
         remoteVideo.current.srcObject = streams[0];
       }
     };
+
+    peerConnection.current.oniceconnectionstatechange = () => {
+      if (!peerConnection.current) return;
+      console.log("iceconnectionstatechange", peerConnection.current.iceConnectionState);
+
+      if (peerConnection.current.iceConnectionState === "failed" || peerConnection.current.iceConnectionState === "disconnected") {
+        console.log("Restart ICE after interval");
+
+        setTimeout(() => {
+          peerConnection.current?.restartIce();
+        }, interval);
+      }
+    };
+
+    // Log the stats every interval
+    setInterval(async () => {
+      if (!peerConnection.current) return;
+      peerConnection.current.getStats().then((stats) => {
+        let reports: any[] = [];
+        stats.forEach((value) => {
+          reports.push(value);
+        });
+        console.log("STATS", reports);
+      });
+    }, interval);
+
+    // Log all the other events
+    const logEvent = (name: string) => {
+      if (!peerConnection.current) return;
+      peerConnection.current.addEventListener(name, (event: any) => {
+        if (peerConnection.current) {
+          console.log(`${name}:`, event);
+        }
+      });
+    };
+
+    logEvent("connectionstatechange");
+    logEvent("datachannel");
+    logEvent("icecandidateerror");
+    logEvent("icegatheringstatechange");
+    logEvent("negotiationneeded");
+    logEvent("signalingstatechange");
   };
 
   /**
@@ -253,7 +304,7 @@ export default function App() {
    * @emits offer - Emits the created SDP offer to the signaling server
    */
   const sendOffer = async () => {
-    console.log('Send offer to peer');
+    console.log("Send offer to peer");
 
     if (!peerConnection.current) {
       throw new Error("Peer connection not initialized");
@@ -287,6 +338,8 @@ export default function App() {
     const answer = await peerConnection.current.createAnswer();
     peerConnection.current.setLocalDescription(answer);
     socket.emit("answer", answer);
+
+    logIceCandidates();
     setCall(true);
   };
 
@@ -295,11 +348,27 @@ export default function App() {
    * Displays local stream in video element
    */
   const startLocalStream = async () => {
-    console.log('Start local stream');
+    console.log("Start local stream");
     localStream.current = await navigator.mediaDevices.getUserMedia(constraints);
     if (localVideo.current) {
       localVideo.current.srcObject = localStream.current;
     }
+  };
+
+  /**
+   * Log the pair of selected ICE candidate
+   */
+  const logIceCandidates = () => {
+    if (!peerConnection.current) return;
+    // Log the selected ICE candidate pair
+    let iceTransport = peerConnection.current.getSenders()[0].transport?.iceTransport;
+
+    const logPair = () => {
+      console.log("ICE candidate pair", iceTransport?.getSelectedCandidatePair());
+    };
+
+    iceTransport?.removeEventListener("selectedcandidatepairchange", logPair);
+    iceTransport?.addEventListener("selectedcandidatepairchange", logPair);
   };
 
   /**
@@ -312,7 +381,7 @@ export default function App() {
     } else {
       await startLocalStream();
     }
-    socket.emit("join", { roomId: room, username: name, config: iceServers.current ? false : true });
+    socket.emit("join", { roomId: roomId, username: userName, config: iceServers.current ? false : true });
   };
 
   /**
@@ -320,8 +389,11 @@ export default function App() {
    * Closes peer connection and cleans up media resources
    */
   const handleHangUp = () => {
-    setCall(false)
-    socket.emit("leave")
+    setCall(false);
+    setRemoteUser(null);
+    setLocalUser(null);
+    setRoom(null);
+    socket.emit("leave");
     if (peerConnection.current) {
       peerConnection.current.close();
       peerConnection.current = null;
@@ -334,28 +406,28 @@ export default function App() {
   return (
     <div className="h-screen bg-gray-100 p-8 flex flex-col items-center">
       <div className="w-full bg-white rounded-xl shadow-md p-6 space-y-6">
-        <h1 className="text-2xl font-bold text-center text-gray-800">P2P Video Call</h1>
+        <h1 className="text-2xl font-bold text-center text-gray-800">{room ? room.id : 'P2P Video Call'}</h1>
 
         <div className="flex flex-col sm:flex-row gap-4">
           <input
             type="text"
             placeholder="Name"
-            value={name}
-            onChange={e => setName(e.target.value)}
+            value={userName}
+            onChange={e => setUserName(e.target.value)}
             className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
           />
           <input
             type="text"
             placeholder="Room"
-            value={room}
-            onChange={e => setRoom(e.target.value)}
+            value={roomId}
+            onChange={e => setRoomId(e.target.value)}
             className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
           />
         </div>
 
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="flex-1">
-            <p className="text-sm text-center mb-1 text-gray-600">Local Video</p>
+            <p className="text-sm text-center mb-1 text-gray-600">{localUser ? localUser.name : 'Local Video'}</p>
             <video
               ref={localVideo}
               autoPlay
@@ -365,7 +437,7 @@ export default function App() {
             />
           </div>
           <div className="flex-1">
-            <p className="text-sm text-center mb-1 text-gray-600">Remote Video</p>
+            <p className="text-sm text-center mb-1 text-gray-600">{remoteUser ? remoteUser.name : 'Remote Video'}</p>
             <video
               ref={remoteVideo}
               autoPlay
@@ -379,7 +451,7 @@ export default function App() {
           <button
             onClick={handleJoin}
             className="cursor-pointer bg-green-600 text-white px-5 py-2 rounded-lg shadow disabled:cursor-default enabled:hover:bg-green-700 transition"
-            disabled={!name || !room}
+            disabled={!userName || !roomId}
           >
             Join
           </button>

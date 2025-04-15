@@ -1,24 +1,24 @@
-import 'dotenv/config';
+import "dotenv/config";
 import express from "express";
-import path, { dirname } from 'path';
-import { fileURLToPath } from 'url';
+import path, { dirname } from "path";
+import { fileURLToPath } from "url";
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { Room } from './models/Room.js';
-import { User } from './models/User.js';
+import { Room } from "./models/Room.js";
+import { User } from "./models/User.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 // Environment detection
-const isProd = process.env.NODE_ENV === 'prod';
-console.log(`Running in ${isProd ? 'production' : 'development'} mode`);
+const isProd = process.env.NODE_ENV === "prod";
+console.log(`Running in ${isProd ? "production" : "development"} mode`);
 
 // App init
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-  cors: isProd ? undefined : { origin: '*' }
+  cors: isProd ? undefined : { origin: "*" }
 });
 
 const rooms = new Map<string, Room>();
@@ -33,17 +33,17 @@ fetch(`https://signallingtest.metered.live/api/v1/turn/credentials?apiKey=${proc
 
 // Serve static files in production
 if (isProd) {
-  app.use(express.static(path.join(__dirname, './public')));
-  app.get('/', (_req: any, res: { sendFile: (arg0: string) => void; }) => {
-    res.sendFile(path.join(__dirname, './public/index.html'));
+  app.use(express.static(path.join(__dirname, "./public")));
+  app.get("/", (_req: any, res: { sendFile: (arg0: string) => void; }) => {
+    res.sendFile(path.join(__dirname, "./public/index.html"));
   });
 }
 
 // Handle new client connection
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   let room: Room;
   let user: User;
-  console.log('User connected:', socket.id);
+  console.log("User connected:", socket.id);
 
   /**
    * Logs a message on the server and emits it to the connected socket client.
@@ -52,28 +52,29 @@ io.on('connection', (socket) => {
    * @param {...string[]} args - Variable number of string arguments to be logged
    * @returns {void}
    * 
-   * @emits log - Emits the log message to the client with the same event name 'log'
+   * @emits log - Emits the log message to the client with the same event name "log"
    */
   function log(...data: any) {
 
     if (!isProd) console.log(data);
 
-    io.to(room.id).emit('log', data);
+    io.to(room.id).emit("log", data);
   }
 
   /**
-   * Handles a 'join' event from a client wanting to join a specific room.
+   * Handles a "join" event from a client wanting to join a specific room.
    * 
    * @param {Object} payload - The join request data
    * @param {string} payload.roomId - The ID of the room to join/create
    * @param {string} payload.username - The username of the joining client
    * @param {boolean} payload.config - Whther the user needs the config (i.e. the iceServers)
    * 
-   * @emits {config} To all clients in the room - Sends ICE server configuration
+   * @emits {joined} To the client - Sends User, Room and ICE server configuration
+   * @emits {ready} To other clients in the room - The call can start
    * 
    * @listens join - Triggered when a client wants to join a room
    */
-  socket.on('join', ({ roomId, username, config }) => {
+  socket.on("join", ({ roomId, username, config }) => {
     let exists = rooms.has(roomId);
     if (exists) {
       room = rooms.get(roomId) as Room;
@@ -95,15 +96,14 @@ io.on('connection', (socket) => {
     if (!exists) log(`Room "${room.id}" created by user ${user.name}`);
 
     log(`[${room.id}] - User ${user.name} joined`);
+    socket.emit("joined", user.serialize(), room.serialize(), config ? iceServers : null);
 
-    socket.emit('joined', user, room, config ? iceServers : null);
 
-
-    if (room.isFull()) socket.to(room.id).emit('ready');
+    if (room.isFull()) socket.to(room.id).emit("ready");
   });
 
   /**
-   * Handles a 'offer' event from a client sending an SDP offer to peers.
+   * Handles a "offer" event from a client sending an SDP offer to peers.
    * 
    * @param {string} offer - The SDP offer string
    * 
@@ -111,13 +111,13 @@ io.on('connection', (socket) => {
    * 
    * @listens offer - Triggered when a client sends an offer
    */
-  socket.on('offer', (offer: RTCSessionDescriptionInit) => {
+  socket.on("offer", (offer: RTCSessionDescriptionInit) => {
     log(`[${room.id}] - User ${user.name} offer`, offer);
-    socket.to(room.id).emit('offer', offer);
+    socket.to(room.id).emit("offer", user, offer);
   });
 
   /**
-   * Handles an 'answer' event from a client responding to an SDP offer.
+   * Handles an "answer" event from a client responding to an SDP offer.
    * 
    * @param {string} answer - The SDP answer string
    * 
@@ -125,13 +125,13 @@ io.on('connection', (socket) => {
    * 
    * @listens answer - Triggered when a client sends an answer to an offer
    */
-  socket.on('answer', (answer: RTCSessionDescriptionInit) => {
+  socket.on("answer", (answer: RTCSessionDescriptionInit) => {
     log(`[${room.id}] - User ${user.name} answer`, answer);
-    socket.to(room.id).emit('answer', answer);
+    socket.to(room.id).emit("answer", user, answer);
   });
 
   /**
-   * Handles a 'candidate' event from a client sending ICE candidates.
+   * Handles a "candidate" event from a client sending ICE candidates.
    * 
    * @param {string} candidate - The ICE candidate string
    * 
@@ -139,24 +139,24 @@ io.on('connection', (socket) => {
    * 
    * @listens candidate - Triggered when a client sends an ICE candidate
    */
-  socket.on('candidate', (candidate: RTCIceCandidate) => {
+  socket.on("candidate", (candidate: RTCIceCandidate) => {
     log(`[${room.id}] - User ${user.name} candidate`, candidate);
-    socket.to(room.id).emit('candidate', candidate);
+    socket.to(room.id).emit("candidate", candidate);
   });
 
 
   /**
-   * Handles a 'leave' event from a client disconnecting from a room.
+   * Handles a "leave" event from a client disconnecting from a room.
    * 
    * @emits leave - Notifies other clients in the room about the departure
    * 
    * @listens leave - Triggered when a client leaves a room
    */
-  socket.on('leave', () => {
+  socket.on("leave", () => {
     log(`[${room.id}] - User ${user.name} left`);
     if (!room) return;
     room.removeUser(user.id);
-    socket.to(room.id).emit('leave', user);
+    socket.to(room.id).emit("leave", user);
 
     if (room.isEmpty()) {
       log(`[${room.id}] - Empty room`);
