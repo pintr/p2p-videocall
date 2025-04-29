@@ -109,6 +109,7 @@ export default function App() {
   const [remoteUser, setRemoteUser] = useState<User | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   const [call, setCall] = useState(false);
+  const [isOfferer, setIsOfferer] = useState(false);
 
   const iceServers = useRef<RTCIceServer[] | null>(null);
   const joined = useRef<boolean>(false);
@@ -153,6 +154,7 @@ export default function App() {
 
       if (joined.current) {
         setupPeerConnection();
+        setIsOfferer(true);
         sendOffer();
       }
     });
@@ -163,6 +165,7 @@ export default function App() {
      */
     socket.on("offer", (user, offer) => {
       setupPeerConnection();
+      setIsOfferer(false);
       sendAnswer(offer);
       setRemoteUser(user);
     });
@@ -249,16 +252,19 @@ export default function App() {
       }
     };
 
+    // Manage the ICE connection changes
     peerConnection.current.oniceconnectionstatechange = () => {
       if (!peerConnection.current) return;
-      console.log("iceconnectionstatechange", peerConnection.current.iceConnectionState);
+      const currentState = peerConnection.current.iceConnectionState;
+      console.log("iceconnectionstatechange", currentState);
 
-      if (peerConnection.current.iceConnectionState === "failed" || peerConnection.current.iceConnectionState === "disconnected") {
-        console.log("Restart ICE after interval");
-
-        setTimeout(() => {
-          peerConnection.current?.restartIce();
-        }, interval);
+      if (currentState === "failed" || currentState === "disconnected") {
+        if (isOfferer) {
+          console.log("Attempting to restart ICE as offerer.");
+          peerConnection.current.restartIce();
+        } else {
+          console.log("Waiting for the offerer peer to restart ICE.");
+        }
       }
     };
 
@@ -310,7 +316,7 @@ export default function App() {
       throw new Error("Peer connection not initialized");
     }
 
-    const offer = await peerConnection.current.createOffer();
+    const offer = await peerConnection.current.createOffer({ iceRestart: true });
     peerConnection.current.setLocalDescription(offer);
     socket.emit("offer", offer);
   };
@@ -401,6 +407,7 @@ export default function App() {
     if (remoteVideo.current) {
       remoteVideo.current.srcObject = null;
     }
+    setIsOfferer(false); // Reset offerer state on hangup
   };
 
   return (
