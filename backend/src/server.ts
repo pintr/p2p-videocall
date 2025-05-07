@@ -96,7 +96,7 @@ io.on("connection", (socket) => {
     if (!exists) log(`Room "${room.id}" created by user ${user.name}`);
 
     log(`[${room.id}] - User ${user.name} joined`);
-    socket.emit("joined", user.serialize(), room.serialize(), config ? iceServers : null);
+    socket.emit("joined", user.serialize(), room.serialize(), !exists, config ? iceServers : null);
 
 
     if (room.isFull()) socket.to(room.id).emit("ready");
