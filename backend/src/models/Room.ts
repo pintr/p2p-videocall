@@ -10,6 +10,11 @@ export class Room {
   id: string;
 
   /**
+   * The identifier of the creator of the room.
+   */
+  creator: string;
+
+  /**
    * The list of users currently in the room.
    */
   users: Map<string, User>;
@@ -26,18 +31,28 @@ export class Room {
 
   /**
    * Creates a new Room instance.
-   * @param id - The unique identifier for the room.
+   * @param {string} id - The unique identifier for the room.
+   * @param {string} creator - The id of the creator of the room.
    */
-  constructor(id: string) {
+  constructor(id: string, creator: string) {
     this.id = id;
+    this.creator = creator;
     this.users = new Map<string, User>();
     this.created = Date.now();
     this.maxUsers = 2;
   }
 
   /**
+   * Checks if the user is the creator of the room 
+   * @param {string} userId 
+   * @returns {boolean}  Whther the user is the creator of the room.
+   */
+  isCreator(userId: string): boolean {
+    return this.creator === userId;
+  }
+  /**
    * Adds a user to the room if the room is not full.
-   * @param user - The user to be added to the room.
+   * @param {User} user - The user to be added to the room.
    */
   addUser(user: User) {
     this.users.set(user.id, user);
@@ -45,15 +60,15 @@ export class Room {
 
   /**
    * Removes a user from the room by their unique identifier.
-   * @param userId - The unique identifier of the user to be removed.
+   * @param {string} userId - The unique identifier of the user to be removed.
    */
   removeUser(userId: string) {
     this.users.delete(userId);
   }
 
   /**
-   * Check if the user is present in the room.
-   * @param userId - The unique identifier of the user.
+   * Checks if the user is present in the room.
+   * @param {string} userId - The unique identifier of the user.
    * 
    * @returns {boolean}  Whther the user is in the room.
    */
@@ -63,7 +78,7 @@ export class Room {
 
   /**
    * Get a user based on its id.
-   * @param userId - The unique identifier of the user.
+   * @param {string} userId - The unique identifier of the user.
    * 
    * @returns {User | undefined}  The user if it exists, `undefined` otherwise .
    */

@@ -300,25 +300,25 @@ export default function App() {
       }
     };
 
-    peerConnection.current.onnegotiationneeded = async () => {
-      if (!peerConnection.current || !joined.current) return;
-      console.log("negotiationneeded event triggered.");
-      if (isOfferer.current) {
-        // Avoid sending offer if not in a stable state to do so, or if an offer/answer is already in progress.
-        // For instance, after restartIce(), signalingState might be 'stable'.
-        if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-remote-offer") {
-          // If 'have-remote-offer', we should be creating an answer.
-          // This logic implies negotiationneeded is primarily for offerer to send offer.
-          // A more robust check might be needed depending on all scenarios firing negotiationneeded.
-          console.log(`Sending offer due to negotiationneeded. Signaling state: ${peerConnection.current.signalingState}`);
-          await sendOffer();
-        } else {
-          console.log(`negotiationneeded fired but signalingState is ${peerConnection.current.signalingState}, not sending offer now.`);
-        }
-      } else {
-        console.log("negotiationneeded event triggered, but not the offerer. No action taken by this peer.");
-      }
-    };
+    // peerConnection.current.onnegotiationneeded = async () => {
+    //   if (!peerConnection.current || !joined.current) return;
+    //   console.log("negotiationneeded event triggered.");
+    //   if (isOfferer.current) {
+    //     // Avoid sending offer if not in a stable state to do so, or if an offer/answer is already in progress.
+    //     // For instance, after restartIce(), signalingState might be 'stable'.
+    //     if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-remote-offer") {
+    //       // If 'have-remote-offer', we should be creating an answer.
+    //       // This logic implies negotiationneeded is primarily for offerer to send offer.
+    //       // A more robust check might be needed depending on all scenarios firing negotiationneeded.
+    //       console.log(`Sending offer due to negotiationneeded. Signaling state: ${peerConnection.current.signalingState}`);
+    //       await sendOffer();
+    //     } else {
+    //       console.log(`negotiationneeded fired but signalingState is ${peerConnection.current.signalingState}, not sending offer now.`);
+    //     }
+    //   } else {
+    //     console.log("negotiationneeded event triggered, but not the offerer. No action taken by this peer.");
+    //   }
+    // };
 
     // Log the stats every interval
     setInterval(async () => {

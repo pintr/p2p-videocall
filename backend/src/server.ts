@@ -76,14 +76,16 @@ io.on("connection", (socket) => {
    * @listens join - Triggered when a client wants to join a room
    */
   socket.on("join", ({ roomId, userId, username, config }) => {
-    let exists = rooms.has(roomId);
-    user = new User(socket.id, username, room.id);
-    if (exists) {
+    if (rooms.has(roomId)) {
       room = rooms.get(roomId) as Room;
-      if (room.getUser(user.id)) return;
+      if (room.hasUser(userId)) {
+        log(`[${room.id}] - User ${username} with ID ${userId} already in the room. Rejoin`);
+        room.removeUser(userId);
+      }
     } else {
-      room = new Room(roomId);
+      room = new Room(roomId, userId);
       rooms.set(room.id, room);
+      log(`Room "${room.id}" created by user ${username}`);
     }
 
     if (room.isFull()) {
@@ -91,14 +93,13 @@ io.on("connection", (socket) => {
       return;
     }
 
+    user = new User(userId, socket.id, username, room.id);
 
     room.addUser(user);
     socket.join(room.id);
 
-    if (!exists) log(`Room "${room.id}" created by user ${user.name}`);
-
     log(`[${room.id}] - User ${user.name} joined`);
-    socket.emit("joined", user.serialize(), room.serialize(), !exists, config ? iceServers : null);
+    socket.emit("joined", user.serialize(), room.serialize(), room.isCreator(userId), config ? iceServers : null);
 
 
     if (room.isFull()) socket.to(room.id).emit("ready");

@@ -1,6 +1,3 @@
-import { randomUUID } from "crypto";
-
-
 /**
  * Represents a user in the video call application.
  */
@@ -32,12 +29,13 @@ export class User {
   /**
    * Creates a new User instance.
    * 
+   * @param {string} userId - Unique user ID created by the client.
    * @param {string} socketId - The socket id for the user.
    * @param {string} name - The display name of the user.
    * @param {string} roomId - The ID of the room the user is in.
    */
-  constructor(socketId: string, name: string, roomId: string) {
-    this.id = randomUUID();
+  constructor(userId: string, socketId: string, name: string, roomId: string) {
+    this.id = userId;
     this.socketId = socketId;
     this.name = name;
     this.roomId = roomId;
@@ -50,7 +48,7 @@ export class User {
    */
   serialize(): object {
     return {
-      uuid: this.id,
+      id: this.id,
       socketId: this.socketId,
       name: this.name,
       roomId: this.roomId,
