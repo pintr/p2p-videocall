@@ -52,6 +52,16 @@ export class Room {
   }
 
   /**
+   * Check if the user is present in the room.
+   * @param userId - The unique identifier of the user.
+   * 
+   * @returns {boolean}  Whther the user is in the room.
+   */
+  hasUser(userId: string): boolean {
+    return this.users.has(userId);
+  }
+
+  /**
    * Get a user based on its id.
    * @param userId - The unique identifier of the user.
    * 

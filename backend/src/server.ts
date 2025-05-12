@@ -18,7 +18,8 @@ console.log(`Running in ${isProd ? "production" : "development"} mode`);
 const app = express();
 const server = createServer(app);
 const io = new Server(server, {
-  cors: isProd ? undefined : { origin: "*" }
+  cors: isProd ? undefined : { origin: "*" },
+  connectionStateRecovery: {}
 });
 
 const rooms = new Map<string, Room>();
@@ -74,11 +75,12 @@ io.on("connection", (socket) => {
    * 
    * @listens join - Triggered when a client wants to join a room
    */
-  socket.on("join", ({ roomId, username, config }) => {
+  socket.on("join", ({ roomId, userId, username, config }) => {
     let exists = rooms.has(roomId);
+    user = new User(socket.id, username, room.id);
     if (exists) {
       room = rooms.get(roomId) as Room;
-      if (room.getUser(socket.id)) return;
+      if (room.getUser(user.id)) return;
     } else {
       room = new Room(roomId);
       rooms.set(room.id, room);
@@ -89,7 +91,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    user = new User(socket.id, username, room.id);
+
     room.addUser(user);
     socket.join(room.id);
 
@@ -162,6 +164,10 @@ io.on("connection", (socket) => {
       log(`[${room.id}] - Empty room`);
       rooms.delete(room.id);
     }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Socket disconnected", socket.id);
   });
 });
 
