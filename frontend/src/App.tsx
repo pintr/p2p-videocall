@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io, Socket } from "socket.io-client";
+import { v4 as uuid } from 'uuid';
 
 /**
  * Represents a user connected to a video call room
@@ -43,6 +44,7 @@ interface Room {
  */
 interface Join {
   roomId: string,
+  userId: string,
   username: string,
   config?: boolean;
 }
@@ -80,14 +82,18 @@ interface ServerToClientEvents {
  * @property {function} leave - Notification of leaving the room
  */
 interface ClientToServerEvents {
-  join: ({ roomId, username, config }: Join) => void;
+  join: ({ roomId, userId, username, config }: Join) => void;
   offer: (offer: RTCSessionDescriptionInit) => void;
   answer: (answer: RTCSessionDescriptionInit) => void;
   candidate: (candidate: RTCIceCandidate) => void;
   leave: () => void;
 }
 
-const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io();
+const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
+  transports: ['websocket'],
+  forceNew: false,
+  reconnection: true
+});
 
 const constraints = {
   audio: true,
@@ -105,11 +111,11 @@ const interval = 10000;
 export default function App() {
   const [userName, setUserName] = useState("");
   const [roomId, setRoomId] = useState("room1");
-  const [call, setCall] = useState(false);
   const [room, setRoom] = useState<Room | null>(null);
   const [localUser, setLocalUser] = useState<User | null>(null);
   const [remoteUser, setRemoteUser] = useState<User | null>(null);
 
+  const inCall = useRef<boolean>(false);
   const isOfferer = useRef<boolean>(false);
   const iceServers = useRef<RTCIceServer[] | null>(null);
   const joined = useRef<boolean>(false);
@@ -123,6 +129,19 @@ export default function App() {
    * Handles offer/answer exchange and ICE candidate negotiation
    */
   useEffect(() => {
+    socket.on("connect", async () => {
+      console.log("CONNECTED", socket.id);
+
+      if (inCall.current) {
+        console.log("Attempting to rejoin room after reconnection...");
+        if (!localStream.current && localVideo.current) {
+          await startLocalStream();
+        }
+        // Always request config on rejoin as network might have changed
+        socket.emit("join", { roomId: roomId, userId: uuid(), username: userName, config: true });
+      }
+    });
+
     /**
      * Handles server log messages
      * @param {string[]} data - Log messages from server
@@ -140,8 +159,8 @@ export default function App() {
     socket.on("joined", (_user, _room, _offerer, _iceServers) => {
       console.log("JOINED", "USER", _user, "ROOM", _room, "OFFERER", _offerer, "ICE", _iceServers);
       setLocalUser(_user);
-      setRoom(room)
-      isOfferer.current = _offerer
+      setRoom(room);
+      isOfferer.current = _offerer;
       if (_iceServers) iceServers.current = _iceServers;
       joined.current = true;
     });
@@ -154,7 +173,9 @@ export default function App() {
       console.log("READY - The room is full and the call can start");
 
       if (joined.current) {
-        setupPeerConnection();
+        if (!peerConnection.current) {
+          setupPeerConnection();
+        }
         sendOffer();
       }
     });
@@ -207,6 +228,7 @@ export default function App() {
 
     // Cleanup function to remove event listeners
     return () => {
+      console.log("Socket cleanup");
       socket.off("log");
       socket.off("joined");
       socket.off("ready");
@@ -262,13 +284,39 @@ export default function App() {
           console.log("Attempting to restart ICE as offerer.");
           // Check if restartIce is available and signaling state allows it
           if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-local-offer" || peerConnection.current.signalingState === "have-remote-offer") {
-            peerConnection.current.restartIce();
+            try {
+              peerConnection.current.restartIce();
+            } catch (e) {
+              console.error("Error calling restartIce:", e, "Falling back to new offer.");
+              sendOffer(); // Fallback
+            }
           } else {
             console.log("Cannot restart ICE, signaling state is:", peerConnection.current.signalingState);
+            sendOffer();
           }
         } else {
           console.log("ICE connection issue. Waiting for the offerer peer to restart ICE or send a new offer.");
         }
+      }
+    };
+
+    peerConnection.current.onnegotiationneeded = async () => {
+      if (!peerConnection.current || !joined.current) return;
+      console.log("negotiationneeded event triggered.");
+      if (isOfferer.current) {
+        // Avoid sending offer if not in a stable state to do so, or if an offer/answer is already in progress.
+        // For instance, after restartIce(), signalingState might be 'stable'.
+        if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-remote-offer") {
+          // If 'have-remote-offer', we should be creating an answer.
+          // This logic implies negotiationneeded is primarily for offerer to send offer.
+          // A more robust check might be needed depending on all scenarios firing negotiationneeded.
+          console.log(`Sending offer due to negotiationneeded. Signaling state: ${peerConnection.current.signalingState}`);
+          await sendOffer();
+        } else {
+          console.log(`negotiationneeded fired but signalingState is ${peerConnection.current.signalingState}, not sending offer now.`);
+        }
+      } else {
+        console.log("negotiationneeded event triggered, but not the offerer. No action taken by this peer.");
       }
     };
 
@@ -298,7 +346,7 @@ export default function App() {
     logEvent("datachannel");
     logEvent("icecandidateerror");
     logEvent("icegatheringstatechange");
-    logEvent("negotiationneeded");
+    // logEvent("negotiationneeded");
     logEvent("signalingstatechange");
   };
 
@@ -390,8 +438,8 @@ export default function App() {
     } else {
       await startLocalStream();
     }
-    socket.emit("join", { roomId: roomId, username: userName, config: iceServers.current ? false : true });
-    setCall(true);
+    socket.emit("join", { roomId: roomId, userId: uuid(), username: userName, config: iceServers.current ? false : true });
+    inCall.current = true;
   };
 
   /**
@@ -399,10 +447,11 @@ export default function App() {
    * Closes peer connection and cleans up media resources
    */
   const handleHangUp = () => {
-    setCall(false);
+    inCall.current = false;
     setRemoteUser(null);
+
     setLocalUser(null);
-    setRoom(null)
+    setRoom(null);
     socket.emit("leave");
     if (joined.current) {
       joined.current = false;
@@ -471,7 +520,7 @@ export default function App() {
           <button
             onClick={handleHangUp}
             className="cursor-pointer bg-red-600 text-white px-5 py-2 rounded-lg shadow disabled:cursor-default enabled:hover:bg-red-700 transition"
-            disabled={!call}
+            disabled={!inCall.current}
           >
             Leave
           </button>
