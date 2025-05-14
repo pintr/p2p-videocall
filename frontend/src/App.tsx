@@ -446,7 +446,7 @@ export default function App() {
   };
 
   return (
-    <div className="h-screen bg-gray-100 p-8 flex flex-col items-center">
+    <div className="h-lvh bg-gray-100 p-8 flex flex-col items-center">
       <div className="w-full bg-white rounded-xl shadow-md p-6 space-y-6">
         <h1 className="text-2xl font-bold text-center text-gray-800">{room ? room.id : 'P2P Video Call'}</h1>
 
@@ -456,14 +456,14 @@ export default function App() {
             placeholder="Name"
             value={userName}
             onChange={e => setUserName(e.target.value)}
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
+            className="flex-1 w-full p-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
           />
           <input
             type="text"
             placeholder="Room"
             value={roomId}
             onChange={e => setRoomId(e.target.value)}
-            className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
+            className="flex-1 w-full p-2 border rounded-lg focus:outline-none focus:ring focus:ring-blue-300"
           />
         </div>
 
@@ -475,7 +475,7 @@ export default function App() {
               autoPlay
               playsInline
               muted
-              className="w-full h-180 object-cover rounded-lg border shadow-sm"
+              className="w-full md:h-180 object-cover rounded-lg border shadow-sm"
             />
           </div>
           <div className="flex-1">
@@ -484,7 +484,7 @@ export default function App() {
               ref={remoteVideo}
               autoPlay
               playsInline
-              className="w-full h-180 object-cover rounded-lg border shadow-sm"
+              className="w-full md:h-180 object-cover rounded-lg border shadow-sm"
             />
           </div>
         </div>
