@@ -76,8 +76,10 @@ io.on("connection", (socket) => {
    * @listens join - Triggered when a client wants to join a room
    */
   socket.on("join", ({ roomId, userId, username, config }) => {
+    log(`[${room.id}] - ${room.getUser(userId)} - ${room.serialize()}`);
     if (rooms.has(roomId)) {
       room = rooms.get(roomId) as Room;
+
       if (room.hasUser(userId)) {
         log(`[${room.id}] - User ${username} with ID ${userId} already in the room. Rejoin`);
         room.removeUser(userId);

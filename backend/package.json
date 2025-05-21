@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon --watch src --exec tsx src/server.ts",
-    "build": "tsc --build",
+    "build": "node ./node_modules/typescript/bin/tsc --build",
     "start": "node dist/server.js"
   },
   "dependencies": {
@@ -15,8 +15,8 @@
     "uuid": "^11.1.0"
   },
   "devDependencies": {
-    "@types/express": "^5.0.1",
-    "@types/node": "^22.14.0",
+    "@types/express": "5.0.2",
+    "@types/node": "22.15.21",
     "nodemon": "^3.1.9",
     "tsx": "^4.19.3",
     "typescript": "^5.8.3"
