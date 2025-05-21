@@ -475,7 +475,7 @@ export default function App() {
               autoPlay
               playsInline
               muted
-              className="w-full md:h-180 object-cover rounded-lg border shadow-sm"
+              className="w-full h-60 md:h-180 object-cover rounded-lg border shadow-sm"
             />
           </div>
           <div className="flex-1">
@@ -484,7 +484,7 @@ export default function App() {
               ref={remoteVideo}
               autoPlay
               playsInline
-              className="w-full md:h-180 object-cover rounded-lg border shadow-sm"
+              className="w-full h-60 md:h-180 object-cover rounded-lg border shadow-sm"
             />
           </div>
         </div>
