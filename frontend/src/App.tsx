@@ -115,6 +115,7 @@ export default function App() {
   const [localUser, setLocalUser] = useState<User | null>(null);
   const [remoteUser, setRemoteUser] = useState<User | null>(null);
 
+  const userNameRef = useRef<string>(userName);
   const inCall = useRef<boolean>(false);
   const isOfferer = useRef<boolean>(false);
   const iceServers = useRef<RTCIceServer[] | null>(null);
@@ -124,21 +125,32 @@ export default function App() {
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
 
+  const userId = uuid();
+
+  // Keep the ref updated with current userName
+  useEffect(() => {
+    userNameRef.current = userName;
+  }, [userName]);
+
   /**
    * Sets up socket.io event listeners for WebRTC signaling
    * Handles offer/answer exchange and ICE candidate negotiation
    */
   useEffect(() => {
+    let isEffectActive = true;
     socket.on("connect", async () => {
-      console.log("CONNECTED", socket.id);
+      if (!isEffectActive) return;
+
+      console.log("CONNECTED", socket.id, "USER ID", userId);
 
       if (inCall.current) {
-        console.log("Attempting to rejoin room after reconnection...");
+        console.log("Attempting to rejoin room after reconnection with ID", userId, "and name", userNameRef.current);
         if (!localStream.current && localVideo.current) {
           await startLocalStream();
         }
+
         // Always request config on rejoin as network might have changed
-        socket.emit("join", { roomId: roomId, userId: uuid(), username: userName, config: true });
+        socket.emit("join", { roomId: roomId, userId: userId, username: userNameRef.current, config: true });
       }
     });
 
@@ -147,6 +159,8 @@ export default function App() {
      * @param {string[]} data - Log messages from server
      */
     socket.on("log", (data) => {
+      if (!isEffectActive) return;
+
       console.log("%c SERVER", "color: #4287f5", data);
     });
 
@@ -157,7 +171,9 @@ export default function App() {
      * @param {RTCIceServer[] | null} servers - STUN/TURN servers for connection
      */
     socket.on("joined", (_user, _room, _offerer, _iceServers) => {
-      console.log("JOINED", "USER", _user, "ROOM", _room, "OFFERER", _offerer, "ICE", _iceServers);
+      if (!isEffectActive) return;
+
+      console.log("USER", _user, " JOINED ROOM", _room, "OFFERER", _offerer, "ICE", _iceServers);
       setLocalUser(_user);
       setRoom(room);
       isOfferer.current = _offerer;
@@ -170,6 +186,8 @@ export default function App() {
      * Initiates WebRTC connection by creating and sending offer
      */
     socket.on("ready", () => {
+      if (!isEffectActive) return;
+
       console.log("READY - The room is full and the call can start");
 
       if (joined.current) {
@@ -185,6 +203,8 @@ export default function App() {
      * @param {RTCSessionDescriptionInit} offer - SDP offer from remote peer
      */
     socket.on("offer", (user, offer) => {
+      if (!isEffectActive) return;
+
       setupPeerConnection();
       sendAnswer(offer);
       setRemoteUser(user);
@@ -195,6 +215,8 @@ export default function App() {
      * @param {RTCSessionDescriptionInit} answer - SDP answer from remote peer
      */
     socket.on("answer", (user, answer) => {
+      if (!isEffectActive) return;
+
       console.log("Received answer, set remote description");
 
       if (!peerConnection.current) {
@@ -211,6 +233,8 @@ export default function App() {
      * @param {RTCIceCandidate} candidate - ICE candidate from remote peer
      */
     socket.on("candidate", (candidate) => {
+      if (!isEffectActive) return;
+
       peerConnection.current?.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
@@ -219,7 +243,11 @@ export default function App() {
      * @param {User} user - The user who left
      */
     socket.on("leave", (user) => {
+      if (!isEffectActive) return;
+
       console.log(`User ${user.name} left`);
+
+      setRemoteUser(null);
 
       if (remoteVideo.current) {
         remoteVideo.current.srcObject = null;
@@ -229,6 +257,7 @@ export default function App() {
     // Cleanup function to remove event listeners
     return () => {
       console.log("Socket cleanup");
+      isEffectActive = false;
       socket.off("log");
       socket.off("joined");
       socket.off("ready");
@@ -418,7 +447,7 @@ export default function App() {
     } else {
       await startLocalStream();
     }
-    socket.emit("join", { roomId: roomId, userId: uuid(), username: userName, config: iceServers.current ? false : true });
+    socket.emit("join", { roomId: roomId, userId: userId, username: userName, config: iceServers.current ? false : true });
     inCall.current = true;
   };
 
@@ -446,13 +475,14 @@ export default function App() {
   };
 
   return (
-    <div className="h-lvh bg-gray-100 p-8 flex flex-col items-center">
+    <div className="min-h-lvh bg-gray-100 p-8 flex flex-col items-center">
       <div className="w-full bg-white rounded-xl shadow-md p-6 space-y-6">
         <h1 className="text-2xl font-bold text-center text-gray-800">{room ? room.id : 'P2P Video Call'}</h1>
 
         <div className="flex flex-col sm:flex-row gap-4">
           <input
             type="text"
+            name="name"
             placeholder="Name"
             value={userName}
             onChange={e => setUserName(e.target.value)}
@@ -460,6 +490,7 @@ export default function App() {
           />
           <input
             type="text"
+            name="room"
             placeholder="Room"
             value={roomId}
             onChange={e => setRoomId(e.target.value)}

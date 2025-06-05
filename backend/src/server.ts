@@ -45,6 +45,7 @@ io.on("connection", (socket) => {
   let room: Room;
   let user: User;
   console.log("User connected:", socket.id);
+  io.to(socket.id).emit("User connected:", socket.id)
 
   /**
    * Logs a message on the server and emits it to the connected socket client.
@@ -76,22 +77,21 @@ io.on("connection", (socket) => {
    * @listens join - Triggered when a client wants to join a room
    */
   socket.on("join", ({ roomId, userId, username, config }) => {
-    log(`[${room.id}] - ${room.getUser(userId)} - ${room.serialize()}`);
     if (rooms.has(roomId)) {
       room = rooms.get(roomId) as Room;
-
+      log(`Check user ${username} (id: ${userId}) in room ${room.id}`, room.print())
       if (room.hasUser(userId)) {
-        log(`[${room.id}] - User ${username} with ID ${userId} already in the room. Rejoin`);
+        log(`[${room.id}]- User ${username} with ID ${userId} already in the room. Rejoin`);
         room.removeUser(userId);
       }
     } else {
       room = new Room(roomId, userId);
       rooms.set(room.id, room);
-      log(`Room "${room.id}" created by user ${username}`);
+      log(`Room "${room.id}" created by user ${username} `);
     }
 
     if (room.isFull()) {
-      log(`[${room.id}] - Room is full`);
+      log(`[${room.id}]- Room is full`);
       return;
     }
 
@@ -100,8 +100,9 @@ io.on("connection", (socket) => {
     room.addUser(user);
     socket.join(room.id);
 
-    log(`[${room.id}] - User ${user.name} joined`);
-    socket.emit("joined", user.serialize(), room.serialize(), room.isCreator(userId), config ? iceServers : null);
+    log(`User ${username} (id: ${userId}) joined room`, room.print());
+
+    socket.emit("joined", user.print(), room.print(), room.isCreator(userId), config ? iceServers : null);
 
 
     if (room.isFull()) socket.to(room.id).emit("ready");
@@ -117,7 +118,7 @@ io.on("connection", (socket) => {
    * @listens offer - Triggered when a client sends an offer
    */
   socket.on("offer", (offer: RTCSessionDescriptionInit) => {
-    log(`[${room.id}] - User ${user.name} offer`, offer);
+    log(`[${room.id}]- User ${user.name} offer`, offer);
     socket.to(room.id).emit("offer", user, offer);
   });
 
@@ -131,7 +132,7 @@ io.on("connection", (socket) => {
    * @listens answer - Triggered when a client sends an answer to an offer
    */
   socket.on("answer", (answer: RTCSessionDescriptionInit) => {
-    log(`[${room.id}] - User ${user.name} answer`, answer);
+    log(`[${room.id}]- User ${user.name} answer`, answer);
     socket.to(room.id).emit("answer", user, answer);
   });
 
@@ -145,7 +146,7 @@ io.on("connection", (socket) => {
    * @listens candidate - Triggered when a client sends an ICE candidate
    */
   socket.on("candidate", (candidate: RTCIceCandidate) => {
-    log(`[${room.id}] - User ${user.name} candidate`, candidate);
+    log(`[${room.id}]- User ${user.name} candidate`, candidate);
     socket.to(room.id).emit("candidate", candidate);
   });
 
@@ -158,13 +159,13 @@ io.on("connection", (socket) => {
    * @listens leave - Triggered when a client leaves a room
    */
   socket.on("leave", () => {
-    log(`[${room.id}] - User ${user.name} left`);
+    log(`[${room.id}]- User ${user.name} left`);
     if (!room) return;
     room.removeUser(user.id);
     socket.to(room.id).emit("leave", user);
 
     if (room.isEmpty()) {
-      log(`[${room.id}] - Empty room`);
+      log(`[${room.id}]- Empty room`);
       rooms.delete(room.id);
     }
   });
@@ -177,5 +178,5 @@ io.on("connection", (socket) => {
 // Set port and start the signalling server
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on port ${PORT} `);
 });

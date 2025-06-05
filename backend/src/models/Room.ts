@@ -103,15 +103,16 @@ export class Room {
   }
 
   /**
-   * Serializes the room to a plain object.
-   * @returns {object} An object representation of the room.
+   * Format the Room for logging purposes
+   * @returns {object} the printable room object
    */
-  serialize(): object {
+  print(): object {
     return {
       id: this.id,
-      users: Array.from(this.users.values()).map(user => user.serialize()),
-      created: new Date(this.created),
+      creator: this.creator,
+      created: new Date(this.created).toISOString(),
       maxUsers: this.maxUsers,
+      users: [...this.users.values()].map(user => user.print())
     };
   }
 }
