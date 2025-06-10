@@ -35,7 +35,7 @@ fetch(`https://signallingtest.metered.live/api/v1/turn/credentials?apiKey=${proc
 // Serve static files in production
 if (isProd) {
   app.use(express.static(path.join(__dirname, "./public")));
-  app.get("/", (_req: any, res: { sendFile: (arg0: string) => void; }) => {
+  app.get("/", (_req: express.Request, res: { sendFile: (arg0: string) => void; }) => {
     res.sendFile(path.join(__dirname, "./public/index.html"));
   });
 }
@@ -45,7 +45,7 @@ io.on("connection", (socket) => {
   let room: Room;
   let user: User;
   console.log("User connected:", socket.id);
-  io.to(socket.id).emit("User connected:", socket.id)
+  io.to(socket.id).emit("User connected:", socket.id);
 
   /**
    * Logs a message on the server and emits it to the connected socket client.
@@ -56,7 +56,7 @@ io.on("connection", (socket) => {
    * 
    * @emits log - Emits the log message to the client with the same event name "log"
    */
-  function log(...data: any) {
+  function log(...data: unknown[]) {
 
     if (!isProd) console.log(data);
 
@@ -79,7 +79,7 @@ io.on("connection", (socket) => {
   socket.on("join", ({ roomId, userId, username, config }) => {
     if (rooms.has(roomId)) {
       room = rooms.get(roomId) as Room;
-      log(`Check user ${username} (id: ${userId}) in room ${room.id}`, room.print())
+      log(`Check user ${username} (id: ${userId}) in room ${room.id}`, room.print());
       if (room.hasUser(userId)) {
         log(`[${room.id}]- User ${username} with ID ${userId} already in the room. Rejoin`);
         room.removeUser(userId);

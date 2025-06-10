@@ -333,7 +333,7 @@ export default function App() {
     setInterval(async () => {
       if (!peerConnection.current) return;
       peerConnection.current.getStats().then((stats) => {
-        let reports: any[] = [];
+        const reports: RTCStats[] = [];
         stats.forEach((value) => {
           reports.push(value);
         });
@@ -344,7 +344,7 @@ export default function App() {
     // Log all the other events
     const logEvent = (name: string) => {
       if (!peerConnection.current) return;
-      peerConnection.current.addEventListener(name, (event: any) => {
+      peerConnection.current.addEventListener(name, (event: Event) => {
         if (peerConnection.current) {
           console.log(`${name}:`, event);
         }
@@ -427,7 +427,7 @@ export default function App() {
   const logIceCandidates = () => {
     if (!peerConnection.current) return;
     // Log the selected ICE candidate pair
-    let iceTransport = peerConnection.current.getSenders()[0].transport?.iceTransport;
+    const iceTransport = peerConnection.current.getSenders()[0].transport?.iceTransport;
 
     const logPair = () => {
       console.log("ICE candidate pair", iceTransport?.getSelectedCandidatePair());

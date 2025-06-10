@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "install": "cd backend && npm i && cd ../frontend && npm i",
+    "update": "npm update && cd backend && npm update && cd ../frontend && npm update",
     "dev": "concurrently -n BE,FE -c bgBlue.bold,bgGreen.bold \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
@@ -16,7 +17,12 @@
   "license": "MIT",
   "description": "Simple P2P videocall app",
   "devDependencies": {
+    "@eslint/js": "^9.28.0",
     "concurrently": "^9.1.2",
-    "typescript": "^5.8.3"
+    "eslint": "^9.28.0",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.2.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.0"
   }
 }
