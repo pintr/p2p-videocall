@@ -114,6 +114,7 @@ export default function App() {
   const [room, setRoom] = useState<Room | null>(null);
   const [localUser, setLocalUser] = useState<User | null>(null);
   const [remoteUser, setRemoteUser] = useState<User | null>(null);
+  const [userId] = useState(() => uuid());
 
   const userNameRef = useRef<string>(userName);
   const inCall = useRef<boolean>(false);
@@ -124,8 +125,6 @@ export default function App() {
   const remoteVideo = useRef<HTMLVideoElement>(null);
   const localStream = useRef<MediaStream | null>(null);
   const peerConnection = useRef<RTCPeerConnection | null>(null);
-
-  const userId = uuid();
 
   // Keep the ref updated with current userName
   useEffect(() => {
@@ -138,19 +137,35 @@ export default function App() {
    */
   useEffect(() => {
     let isEffectActive = true;
+
+    const handleBeforeUnload = () => {
+      handleHangUp();
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     socket.on("connect", async () => {
       if (!isEffectActive) return;
 
       console.log("CONNECTED", socket.id, "USER ID", userId);
 
       if (inCall.current) {
-        console.log("Attempting to rejoin room after reconnection with ID", userId, "and name", userNameRef.current);
-        if (!localStream.current && localVideo.current) {
-          await startLocalStream();
-        }
+        // Only rejoin if P2P connection is not working
+        const isPeerConnectionWorking = peerConnection.current &&
+          (peerConnection.current.iceConnectionState === "connected" ||
+            peerConnection.current.iceConnectionState === "completed");
 
-        // Always request config on rejoin as network might have changed
-        socket.emit("join", { roomId: roomId, userId: userId, username: userNameRef.current, config: true });
+        if (!isPeerConnectionWorking) {
+          console.log("Attempting to rejoin room after reconnection with ID", userId, "and name", userNameRef.current);
+          if (!localStream.current && localVideo.current) {
+            await startLocalStream();
+          }
+
+          // Always request config on rejoin as network might have changed
+          socket.emit("join", { roomId: roomId, userId: userId, username: userNameRef.current, config: true });
+        } else {
+          console.log("P2P connection is working, skipping rejoin");
+        }
       }
     });
 
@@ -258,6 +273,7 @@ export default function App() {
     return () => {
       console.log("Socket cleanup");
       isEffectActive = false;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       socket.off("log");
       socket.off("joined");
       socket.off("ready");
@@ -456,12 +472,15 @@ export default function App() {
    * Closes peer connection and cleans up media resources
    */
   const handleHangUp = () => {
+    if (inCall.current) {
+      socket.emit("leave");
+    }
+
     inCall.current = false;
     setRemoteUser(null);
-
     setLocalUser(null);
     setRoom(null);
-    socket.emit("leave");
+
     if (joined.current) {
       joined.current = false;
     }
