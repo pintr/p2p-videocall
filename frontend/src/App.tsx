@@ -92,7 +92,7 @@ interface ClientToServerEvents {
 const socket: Socket<ServerToClientEvents, ClientToServerEvents> = io({
   transports: ['websocket'],
   forceNew: false,
-  reconnection: true
+  reconnection: true,
 });
 
 const constraints = {
@@ -330,6 +330,7 @@ export default function App() {
           // Check if restartIce is available and signaling state allows it
           if (peerConnection.current.signalingState === "stable" || peerConnection.current.signalingState === "have-local-offer" || peerConnection.current.signalingState === "have-remote-offer") {
             try {
+              console.log("Restart ICE")
               peerConnection.current.restartIce();
             } catch (e) {
               console.error("Error calling restartIce:", e, "Falling back to new offer.");

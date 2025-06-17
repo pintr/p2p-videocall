@@ -25,12 +25,12 @@ const io = new Server(server, {
 const rooms = new Map<string, Room>();
 
 // Set and retrieve ICE server configuration
-let iceServers: RTCIceServer[];
+let iceServers: RTCIceServer[] = [];
 
-fetch(`https://signallingtest.metered.live/api/v1/turn/credentials?apiKey=${process.env.METERED_KEY}`)
-  .then(async (response: Response) => {
-    iceServers = await response.json() as RTCIceServer[];
-  });
+// fetch(`https://signallingtest.metered.live/api/v1/turn/credentials?apiKey=${process.env.METERED_KEY}`)
+//   .then(async (response: Response) => {
+//     iceServers = await response.json() as RTCIceServer[];
+//   });
 
 // Serve static files in production
 if (isProd) {
